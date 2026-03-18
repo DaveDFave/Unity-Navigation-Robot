@@ -1,125 +1,59 @@
-using System.Security.Cryptography;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class RobotSensors : MonoBehaviour
 {
-    public float sensorDistance;
-
-    public bool frontBlocked;
-    public bool leftBlocked;
-    public bool rightBlocked;
-
-    // Track if vibration is already active for each sensor
-    private bool vibratingFront = false;
-    private bool vibratingLeft = false;
-    private bool vibratingRight = false;
-    private bool vibratingDeadEnd = false;
+    public float frontSensorDistance;
+    public float rightSensorDistance;
+    public float leftSensorDistance;
 
     void Update()
     {
         Gamepad pad = Gamepad.current;
-        if (pad == null)
+        if (pad == null) return;
+
+        RaycastHit frontHit, leftHit, rightHit;
+
+        bool frontBlocked = Physics.Raycast(transform.position, transform.forward, out frontHit, frontSensorDistance);
+        bool leftBlocked = Physics.Raycast(transform.position, -transform.right, out leftHit, leftSensorDistance);
+        bool rightBlocked = Physics.Raycast(transform.position, transform.right, out rightHit, rightSensorDistance);
+
+        // Debug rays
+        Debug.DrawRay(transform.position, transform.forward * frontSensorDistance, Color.red);
+        Debug.DrawRay(transform.position, transform.right * rightSensorDistance, Color.blue);
+        Debug.DrawRay(transform.position, -transform.right * leftSensorDistance, Color.green);
+
+        float leftStrength = 0f;
+        float rightStrength = 0f;
+
+        // FRONT (both motors)
+        if (frontBlocked && frontHit.collider.CompareTag("Wall"))
         {
-           return; 
-        } 
-
-        RaycastHit frontHit;
-        RaycastHit leftHit;
-        RaycastHit rightHit;
-
-        // FRONT SENSOR
-        frontBlocked = Physics.Raycast(transform.position, transform.forward, out frontHit, sensorDistance);
-
-        // LEFT SENSOR
-        leftBlocked = Physics.Raycast(transform.position, -transform.right, out leftHit, sensorDistance);
-
-        // RIGHT SENSOR
-        rightBlocked = Physics.Raycast(transform.position, transform.right, out rightHit, sensorDistance);
-
-        // Debug lines
-        Debug.DrawRay(transform.position, transform.forward * sensorDistance, Color.red);
-        Debug.DrawRay(transform.position, transform.right * sensorDistance, Color.blue);
-        Debug.DrawRay(transform.position, -transform.right * sensorDistance, Color.green);
-
-        bool deadEnd = frontBlocked && leftBlocked && rightBlocked &&
-                       frontHit.collider.CompareTag("Wall") &&
-                       leftHit.collider.CompareTag("Wall") &&
-                       rightHit.collider.CompareTag("Wall");
-
-
-        // Dead end
-        if(deadEnd)
-        {
-            if (!vibratingDeadEnd)
-            {
-                Vibrate(1f, 1f, -1f);
-                vibratingDeadEnd = true;
-                vibratingFront = vibratingLeft = vibratingRight = false;
-            }
+            float strength = 1 - (frontHit.distance / frontSensorDistance);
+            strength = Mathf.Clamp01(strength);
+            strength = strength * strength * strength;
+            pad.SetMotorSpeeds(strength, strength);
+            return;
         }
-        else
-        {
-            vibratingDeadEnd = false;
-            // Wall detection
-            if (frontBlocked && frontHit.collider.CompareTag("Wall"))
-            {
-                if (!vibratingFront)
-                    {
-                        Vibrate(1f, 1f, 0.5f);
-                        vibratingFront = true;
-                    }
-            }
-            else
-            {
-                vibratingFront = false;
-            }
-            if (leftBlocked && leftHit.collider.CompareTag("Wall"))
-            {
-                if (!vibratingLeft)
-                    {
-                        Vibrate(0.5f, 0.5f, 0.1f);
-                        vibratingLeft = true;
-                    }
-            }
-            else
-            {
-                vibratingLeft = false;
-            }
-            if (rightBlocked && rightHit.collider.CompareTag("Wall"))
-            {
-                if (!vibratingRight)
-                    {
-                        Vibrate(0.5f, 0.5f, 0.1f);
-                        vibratingRight = true;
-                    }
-            }
-            else
-            {
-                vibratingRight = false;
-            }
-        }
-    }
 
-    public void Vibrate(float lowFreq, float highFreq, float duration)
-    {
-        Gamepad pad = Gamepad.current;
-        if(pad != null)
+        // LEFT (left motor only)
+        if (leftBlocked && leftHit.collider.CompareTag("Wall"))
         {
-            pad.SetMotorSpeeds(lowFreq, highFreq);
-            if (duration > 0)
-            {
-                Invoke("StopVibrate", duration);
-            }
+            leftStrength = 1 - (leftHit.distance / leftSensorDistance);
+            leftStrength = Mathf.Clamp01(leftStrength);
+            leftStrength = leftStrength * leftStrength * leftStrength;
+            float pulse = Mathf.PingPong(Time.time * 3f, 1f);
+            leftStrength *= pulse;
         }
-    }
 
-    public void StopVibrate()
-    {
-        Gamepad pad = Gamepad.current;
-        if(pad != null)
+        // RIGHT (right motor only)
+        if (rightBlocked && rightHit.collider.CompareTag("Wall"))
         {
-            pad.SetMotorSpeeds(0,0);
+            rightStrength = 1 - (rightHit.distance / rightSensorDistance);
+            rightStrength = Mathf.Clamp01(rightStrength);
+            rightStrength = rightStrength * rightStrength * rightStrength;
         }
+        // APPLY FINAL VIBRATION
+        pad.SetMotorSpeeds(leftStrength, rightStrength);
     }
 }
