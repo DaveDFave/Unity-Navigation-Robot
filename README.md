@@ -1,4 +1,4 @@
-#**EchoPath**
+# EchoPath
 
 ## Overview
 A haptic-based maze navigation game designed for visually impaired players.
