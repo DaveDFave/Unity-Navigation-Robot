@@ -9,16 +9,13 @@ public class RobotSensors : MonoBehaviour
 
     void Update()
     {
-        Gamepad pad = Gamepad.current;
-        if (pad == null) return;
-
         RaycastHit frontHit, leftHit, rightHit;
 
         bool frontBlocked = Physics.Raycast(transform.position, transform.forward, out frontHit, frontSensorDistance);
         bool leftBlocked = Physics.Raycast(transform.position, -transform.right, out leftHit, leftSensorDistance);
         bool rightBlocked = Physics.Raycast(transform.position, transform.right, out rightHit, rightSensorDistance);
 
-        // Debug rays
+        // Debug rays (always visible now)
         Debug.DrawRay(transform.position, transform.forward * frontSensorDistance, Color.red);
         Debug.DrawRay(transform.position, transform.right * rightSensorDistance, Color.blue);
         Debug.DrawRay(transform.position, -transform.right * leftSensorDistance, Color.green);
@@ -32,28 +29,43 @@ public class RobotSensors : MonoBehaviour
             float strength = 1 - (frontHit.distance / frontSensorDistance);
             strength = Mathf.Clamp01(strength);
             strength = strength * strength * strength;
-            pad.SetMotorSpeeds(strength, strength);
-            return;
+
+            leftStrength = strength;
+            rightStrength = strength;
+
+            Debug.Log("Front");
+        }
+        else
+        {
+            // LEFT (only if no front)
+            if (leftBlocked && leftHit.collider.CompareTag("Wall"))
+            {
+                leftStrength = 1 - (leftHit.distance / leftSensorDistance);
+                leftStrength = Mathf.Clamp01(leftStrength);
+                leftStrength = leftStrength * leftStrength * leftStrength;
+
+                float pulse = Mathf.PingPong(Time.time * 3f, 1f);
+                leftStrength *= pulse;
+
+                Debug.Log("Left");
+            }
+
+            // RIGHT (only if no front)
+            if (rightBlocked && rightHit.collider.CompareTag("Wall"))
+            {
+                rightStrength = 1 - (rightHit.distance / rightSensorDistance);
+                rightStrength = Mathf.Clamp01(rightStrength);
+                rightStrength = rightStrength * rightStrength * rightStrength;
+
+                Debug.Log("Right");
+            }
         }
 
-        // LEFT (left motor only)
-        if (leftBlocked && leftHit.collider.CompareTag("Wall"))
+        // APPLY VIBRATION (WITH CONTROLLER CHECK AT END)
+        Gamepad pad = Gamepad.current;
+        if (pad != null)
         {
-            leftStrength = 1 - (leftHit.distance / leftSensorDistance);
-            leftStrength = Mathf.Clamp01(leftStrength);
-            leftStrength = leftStrength * leftStrength * leftStrength;
-            float pulse = Mathf.PingPong(Time.time * 3f, 1f);
-            leftStrength *= pulse;
+            pad.SetMotorSpeeds(leftStrength, rightStrength);
         }
-
-        // RIGHT (right motor only)
-        if (rightBlocked && rightHit.collider.CompareTag("Wall"))
-        {
-            rightStrength = 1 - (rightHit.distance / rightSensorDistance);
-            rightStrength = Mathf.Clamp01(rightStrength);
-            rightStrength = rightStrength * rightStrength * rightStrength;
-        }
-        // APPLY FINAL VIBRATION
-        pad.SetMotorSpeeds(leftStrength, rightStrength);
     }
 }

@@ -6,6 +6,7 @@ TagManager:
   tags:
   - WallSensor
   - Wall
+  - Goal
   layers:
   - Default
   - TransparentFX
